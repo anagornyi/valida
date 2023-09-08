@@ -17,3 +17,5 @@ valida-memory = { path = "../memory" }
 valida-derive = { path = "../derive" }
 valida-util = { path = "../util" }
 valida-opcodes = { path = "../opcodes" }
+
+serde = { version = "1.0", default-features = false, features = ["derive"] }

@@ -5,6 +5,8 @@ extern crate self as valida_machine;
 
 use alloc::vec::Vec;
 
+use serde::{Deserialize, Serialize};
+
 pub use crate::core::Word;
 pub use chip::{BusArgument, Chip, Interaction, InteractionType, ValidaAirBuilder};
 
@@ -33,12 +35,13 @@ pub trait Instruction<M: Machine> {
     fn execute(state: &mut M, ops: Operands<i32>);
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct InstructionWord<F> {
     pub opcode: u32,
     pub operands: Operands<F>,
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Operands<F>(pub [F; OPERAND_ELEMENTS]);
 
 impl<F: Copy> Operands<F> {

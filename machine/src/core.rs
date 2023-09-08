@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use super::{Field, PrimeField, MEMORY_CELL_BYTES};
 use core::cmp::Ordering;
 use core::ops::{Add, BitAnd, BitOr, BitXor, Div, Index, IndexMut, Mul, Sub};
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Word<F>(pub [F; MEMORY_CELL_BYTES]);
 
 impl<F: Copy> Word<F> {

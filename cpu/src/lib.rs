@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use core::iter;
 use core::marker::Sync;
 use core::mem::transmute;
+use serde::{Deserialize, Serialize};
 use valida_bus::{MachineWithGeneralBus, MachineWithMemBus};
 use valida_machine::{
     instructions, Chip, Instruction, InstructionWord, Interaction, Operands, Word,
@@ -53,7 +54,7 @@ pub struct CpuChip {
     pub advice_tape: AdviceTape,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct AdviceTape {
     pub data: Vec<Word<u8>>,
 }
