@@ -10,6 +10,8 @@ use valida_machine::{
 };
 use valida_output::MachineWithOutputChip;
 
+use p3_baby_bear::BabyBear;
+
 #[derive(Parser)]
 struct Args {
     /// Program binary file
@@ -24,7 +26,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let mut machine = BasicMachine::default();
+    let mut machine = BasicMachine::<BabyBear, BabyBear>::default();
     let rom = load_program_rom(&args.program).unwrap();
     machine.cpu_mut().fp = args.stack_height;
     machine.cpu_mut().save_register_state();
@@ -48,7 +50,7 @@ fn main() {
     machine.cpu_mut().advice_tape.data.extend(input_words);
 
     // Run the program
-    machine.run(rom);
+    machine.run(&rom);
 
     // Write output chip values to standard output
     std::io::stdout()

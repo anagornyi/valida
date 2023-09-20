@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Field, PrimeField, MEMORY_CELL_BYTES};
 use core::cmp::Ordering;
-use core::ops::{Add, BitAnd, BitOr, BitXor, Div, Index, IndexMut, Mul, Sub};
+use core::ops::{Add, BitAnd, BitOr, BitXor, Div, Index, IndexMut, Mul, Shl, Shr, Sub};
 
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Word<F>(pub [F; MEMORY_CELL_BYTES]);
@@ -87,6 +87,26 @@ impl Div for Word<u8> {
         let b: u32 = self.into();
         let c: u32 = other.into();
         let res = b / c;
+        res.into()
+    }
+}
+
+impl Shl for Word<u8> {
+    type Output = Self;
+    fn shl(self, other: Self) -> Self {
+        let b: u32 = self.into();
+        let c: u32 = other.into();
+        let res = b << c;
+        res.into()
+    }
+}
+
+impl Shr for Word<u8> {
+    type Output = Self;
+    fn shr(self, other: Self) -> Self {
+        let b: u32 = self.into();
+        let c: u32 = other.into();
+        let res = b >> c;
         res.into()
     }
 }

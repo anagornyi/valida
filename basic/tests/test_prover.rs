@@ -8,16 +8,18 @@ use valida_cpu::{
 use valida_machine::config::StarkConfigImpl;
 use valida_machine::{Instruction, InstructionWord, Machine, Operands, ProgramROM, Word};
 use valida_memory::MachineWithMemoryChip;
+use valida_program::MachineWithProgramChip;
 
 use p3_challenger::DuplexChallenger;
 use p3_dft::Radix2Bowers;
 use p3_fri::{FriBasedPcs, FriConfigImpl, FriLdt};
+use p3_keccak::Keccak256Hash;
 use p3_ldt::QuotientMmcs;
 use p3_mds::coset_mds::CosetMds;
 use p3_merkle_tree::MerkleTreeMmcs;
 use p3_poseidon::Poseidon;
-use p3_symmetric::compression::TruncatedPermutation;
-use p3_symmetric::sponge::PaddingFreeSponge;
+use p3_symmetric::compression::CompressionFunctionFromHasher;
+use p3_symmetric::hasher::SerializingHasher32;
 use rand::thread_rng;
 
 #[test]
@@ -44,35 +46,35 @@ fn prove_fibonacci() {
     //...
     program.extend([
         InstructionWord {
-            opcode: <Imm32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Imm32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-4, 0, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Imm32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Imm32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-8, 0, 0, 0, 25]),
         },
         InstructionWord {
-            opcode: <Store32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Store32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([0, -16, -8, 0, 0]),
         },
         InstructionWord {
-            opcode: <Imm32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Imm32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-20, 0, 0, 0, 28]),
         },
         InstructionWord {
-            opcode: <JalInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <JalInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-28, fib_bb0, -28, 0, 0]),
         },
         InstructionWord {
-            opcode: <Store32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Store32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([0, -12, -24, 0, 0]),
         },
         InstructionWord {
-            opcode: <Store32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Store32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([0, 4, -12, 0, 0]),
         },
         InstructionWord {
-            opcode: <StopInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <StopInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands::default(),
         },
     ]);
@@ -86,23 +88,23 @@ fn prove_fibonacci() {
     //	beq	.LBB0_1, 0(fp), 0(fp)
     program.extend([
         InstructionWord {
-            opcode: <Store32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Store32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([0, -4, 12, 0, 0]),
         },
         InstructionWord {
-            opcode: <Imm32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Imm32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-8, 0, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <Imm32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Imm32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-12, 0, 0, 0, 1]),
         },
         InstructionWord {
-            opcode: <Imm32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Imm32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-16, 0, 0, 0, 0]),
         },
         InstructionWord {
-            opcode: <BeqInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <BeqInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([fib_bb0_1, 0, 0, 0, 0]),
         },
     ]);
@@ -112,11 +114,11 @@ fn prove_fibonacci() {
     //	beq	.LBB0_4, 0(fp), 0(fp)
     program.extend([
         InstructionWord {
-            opcode: <BneInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <BneInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([fib_bb0_2, -16, -4, 0, 0]),
         },
         InstructionWord {
-            opcode: <BeqInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <BeqInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([fib_bb0_4, 0, 0, 0, 0]),
         },
     ]);
@@ -128,19 +130,19 @@ fn prove_fibonacci() {
     //	beq	.LBB0_3, 0(fp), 0(fp)
     program.extend([
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Add32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-20, -8, -12, 0, 0]),
         },
         InstructionWord {
-            opcode: <Store32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Store32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([0, -8, -12, 0, 0]),
         },
         InstructionWord {
-            opcode: <Store32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Store32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([0, -12, -20, 0, 0]),
         },
         InstructionWord {
-            opcode: <BeqInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <BeqInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([fib_bb0_3, 0, 0, 0, 0]),
         },
     ]);
@@ -150,11 +152,11 @@ fn prove_fibonacci() {
     //	beq	.LBB0_1, 0(fp), 0(fp)
     program.extend([
         InstructionWord {
-            opcode: <Add32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Add32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-16, -16, 1, 0, 1]),
         },
         InstructionWord {
-            opcode: <BeqInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <BeqInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([fib_bb0_1, 0, 0, 0, 0]),
         },
     ]);
@@ -164,21 +166,22 @@ fn prove_fibonacci() {
     //	jalv	-4(fp), 0(fp), 8(fp)
     program.extend([
         InstructionWord {
-            opcode: <Store32Instruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <Store32Instruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([0, 4, -8, 0, 0]),
         },
         InstructionWord {
-            opcode: <JalvInstruction as Instruction<BasicMachine>>::OPCODE,
+            opcode: <JalvInstruction as Instruction<BasicMachine<Val, Challenge>>>::OPCODE,
             operands: Operands([-4, 0, 8, 0, 0]),
         },
     ]);
 
-    let mut machine = BasicMachine::default();
+    let mut machine = BasicMachine::<Val, Challenge>::default();
     let rom = ProgramROM::new(program);
+    machine.program_mut().set_program_rom(&rom);
     machine.cpu_mut().fp = 0x1000;
     machine.cpu_mut().save_register_state(); // TODO: Initial register state should be saved
                                              // automatically by the machine, not manually here
-    machine.run(rom);
+    machine.run(&rom);
 
     type Val = BabyBear;
     type Dom = BabyBear;
@@ -186,23 +189,19 @@ fn prove_fibonacci() {
     type PackedChallenge = Challenge; // TODO
 
     type Mds16 = CosetMds<Val, 16>;
-    type Mds32 = CosetMds<Val, 32>;
     let mds16 = Mds16::default();
-    let mds32 = Mds32::default();
 
     type Perm16 = Poseidon<Val, Mds16, 16, 5>;
-    type Perm32 = Poseidon<Val, Mds32, 32, 5>;
     let perm16 = Perm16::new_from_rng(4, 22, mds16, &mut thread_rng()); // TODO: Use deterministic RNG
-    let perm32 = Perm32::new_from_rng(4, 22, mds32, &mut thread_rng()); // TODO: Use deterministic RNG
 
-    type H4 = PaddingFreeSponge<Val, Perm32, 32, 24, 8>;
-    let h4 = H4::new(perm32.clone());
+    type MyHash = SerializingHasher32<Val, Keccak256Hash>;
+    let hash = MyHash::new(Keccak256Hash {});
 
-    type C = TruncatedPermutation<Val, Perm16, 2, 8, 16>;
-    let c = C::new(perm16.clone());
+    type MyCompress = CompressionFunctionFromHasher<Val, MyHash, 2, 8>;
+    let compress = MyCompress::new(hash);
 
-    type MyMmcs = MerkleTreeMmcs<Val, [Val; 8], H4, C>;
-    let mmcs = MyMmcs::new(h4, c);
+    type MyMmcs = MerkleTreeMmcs<Val, [Val; 8], MyHash, MyCompress>;
+    let mmcs = MyMmcs::new(hash, compress);
 
     type MyDft = Radix2Bowers;
     let dft = MyDft::default();

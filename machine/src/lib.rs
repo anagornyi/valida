@@ -13,8 +13,7 @@ pub use chip::{BusArgument, Chip, Interaction, InteractionType, ValidaAirBuilder
 use crate::config::StarkConfig;
 use crate::proof::MachineProof;
 pub use p3_field::{
-    AbstractExtensionField, AbstractField, ExtensionField, Field, PrimeField, PrimeField32,
-    PrimeField64,
+    AbstractExtensionField, AbstractField, ExtensionField, Field, PrimeField, PrimeField64,
 };
 
 pub mod __internal;
@@ -35,10 +34,19 @@ pub trait Instruction<M: Machine> {
     fn execute(state: &mut M, ops: Operands<i32>);
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct InstructionWord<F> {
     pub opcode: u32,
     pub operands: Operands<F>,
+}
+
+impl InstructionWord<i32> {
+    pub fn flatten<F: PrimeField64>(&self) -> [F; INSTRUCTION_ELEMENTS] {
+        let mut result = [F::default(); INSTRUCTION_ELEMENTS];
+        result[0] = F::from_canonical_u32(self.opcode);
+        result[1..].copy_from_slice(&Operands::<F>::from_i32_slice(&self.operands.0).0);
+        result
+    }
 }
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize)]
@@ -79,7 +87,7 @@ impl<F: PrimeField> Operands<F> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ProgramROM<F>(pub Vec<InstructionWord<F>>);
 
 impl<F> ProgramROM<F> {
@@ -96,7 +104,7 @@ pub trait Machine {
     type F: PrimeField64;
     type EF: ExtensionField<Self::F>;
 
-    fn run(&mut self, program: ProgramROM<i32>);
+    fn run(&mut self, program: &ProgramROM<i32>);
 
     fn prove<SC>(&self, config: &SC) -> MachineProof<SC>
     where

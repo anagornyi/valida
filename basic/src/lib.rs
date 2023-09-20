@@ -15,7 +15,9 @@ use valida_alu_u32::{
     shift::{MachineWithShift32Chip, Shift32Chip, Shl32Instruction, Shr32Instruction},
     sub::{MachineWithSub32Chip, Sub32Chip, Sub32Instruction},
 };
-use valida_bus::{MachineWithGeneralBus, MachineWithMemBus, MachineWithRangeBus8};
+use valida_bus::{
+    MachineWithGeneralBus, MachineWithMemBus, MachineWithProgramBus, MachineWithRangeBus8,
+};
 use valida_cpu::{
     BeqInstruction, BneInstruction, Imm32Instruction, JalInstruction, JalvInstruction,
     Load32Instruction, ReadAdviceInstruction, StopInstruction, Store32Instruction,
@@ -23,16 +25,19 @@ use valida_cpu::{
 use valida_cpu::{CpuChip, MachineWithCpuChip};
 use valida_derive::Machine;
 use valida_machine::{
-    AbstractExtensionField, AbstractField, BusArgument, Chip, Instruction, Machine, ProgramROM,
+    AbstractExtensionField, AbstractField, BusArgument, Chip, ExtensionField, Instruction, Machine,
+    PrimeField64, ProgramROM, ValidaAirBuilder,
 };
 use valida_memory::{MachineWithMemoryChip, MemoryChip};
 use valida_output::{MachineWithOutputChip, OutputChip, WriteInstruction};
+use valida_program::{MachineWithProgramChip, ProgramChip};
 use valida_range::{MachineWithRangeChip, RangeCheckerChip};
 
 use p3_maybe_rayon::*;
 
 #[derive(Machine, Default)]
-pub struct BasicMachine {
+#[machine_fields(F, EF)]
+pub struct BasicMachine<F: PrimeField64, EF: ExtensionField<F>> {
     // Core instructions
     #[instruction]
     load32: Load32Instruction,
@@ -82,6 +87,8 @@ pub struct BasicMachine {
     #[chip]
     cpu: CpuChip,
     #[chip]
+    program: ProgramChip,
+    #[chip]
     mem: MemoryChip,
     #[chip]
     add_u32: Add32Chip,
@@ -101,27 +108,36 @@ pub struct BasicMachine {
     output: OutputChip,
     #[chip]
     range: RangeCheckerChip<256>,
+
+    _phantom_base: core::marker::PhantomData<F>,
+    _phantom_extension: core::marker::PhantomData<EF>,
 }
 
-impl MachineWithGeneralBus for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithGeneralBus for BasicMachine<F, EF> {
     fn general_bus(&self) -> BusArgument {
         BusArgument::Global(0)
     }
 }
 
-impl MachineWithMemBus for BasicMachine {
-    fn mem_bus(&self) -> BusArgument {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithProgramBus for BasicMachine<F, EF> {
+    fn program_bus(&self) -> BusArgument {
         BusArgument::Global(1)
     }
 }
 
-impl MachineWithRangeBus8 for BasicMachine {
-    fn range_bus(&self) -> BusArgument {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithMemBus for BasicMachine<F, EF> {
+    fn mem_bus(&self) -> BusArgument {
         BusArgument::Global(2)
     }
 }
 
-impl MachineWithCpuChip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithRangeBus8 for BasicMachine<F, EF> {
+    fn range_bus(&self) -> BusArgument {
+        BusArgument::Global(3)
+    }
+}
+
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithCpuChip for BasicMachine<F, EF> {
     fn cpu(&self) -> &CpuChip {
         &self.cpu
     }
@@ -131,7 +147,17 @@ impl MachineWithCpuChip for BasicMachine {
     }
 }
 
-impl MachineWithMemoryChip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithProgramChip for BasicMachine<F, EF> {
+    fn program(&self) -> &ProgramChip {
+        &self.program
+    }
+
+    fn program_mut(&mut self) -> &mut ProgramChip {
+        &mut self.program
+    }
+}
+
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithMemoryChip for BasicMachine<F, EF> {
     fn mem(&self) -> &MemoryChip {
         &self.mem
     }
@@ -141,7 +167,7 @@ impl MachineWithMemoryChip for BasicMachine {
     }
 }
 
-impl MachineWithAdd32Chip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithAdd32Chip for BasicMachine<F, EF> {
     fn add_u32(&self) -> &Add32Chip {
         &self.add_u32
     }
@@ -151,7 +177,7 @@ impl MachineWithAdd32Chip for BasicMachine {
     }
 }
 
-impl MachineWithSub32Chip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithSub32Chip for BasicMachine<F, EF> {
     fn sub_u32(&self) -> &Sub32Chip {
         &self.sub_u32
     }
@@ -161,7 +187,7 @@ impl MachineWithSub32Chip for BasicMachine {
     }
 }
 
-impl MachineWithMul32Chip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithMul32Chip for BasicMachine<F, EF> {
     fn mul_u32(&self) -> &Mul32Chip {
         &self.mul_u32
     }
@@ -171,7 +197,7 @@ impl MachineWithMul32Chip for BasicMachine {
     }
 }
 
-impl MachineWithDiv32Chip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithDiv32Chip for BasicMachine<F, EF> {
     fn div_u32(&self) -> &Div32Chip {
         &self.div_u32
     }
@@ -181,7 +207,7 @@ impl MachineWithDiv32Chip for BasicMachine {
     }
 }
 
-impl MachineWithBitwise32Chip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithBitwise32Chip for BasicMachine<F, EF> {
     fn bitwise_u32(&self) -> &Bitwise32Chip {
         &self.bitwise_u32
     }
@@ -191,7 +217,7 @@ impl MachineWithBitwise32Chip for BasicMachine {
     }
 }
 
-impl MachineWithLt32Chip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithLt32Chip for BasicMachine<F, EF> {
     fn lt_u32(&self) -> &Lt32Chip {
         &self.lt_u32
     }
@@ -201,7 +227,7 @@ impl MachineWithLt32Chip for BasicMachine {
     }
 }
 
-impl MachineWithShift32Chip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithShift32Chip for BasicMachine<F, EF> {
     fn shift_u32(&self) -> &Shift32Chip {
         &self.shift_u32
     }
@@ -211,7 +237,7 @@ impl MachineWithShift32Chip for BasicMachine {
     }
 }
 
-impl MachineWithOutputChip for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithOutputChip for BasicMachine<F, EF> {
     fn output(&self) -> &OutputChip {
         &self.output
     }
@@ -221,7 +247,7 @@ impl MachineWithOutputChip for BasicMachine {
     }
 }
 
-impl MachineWithRangeChip<256> for BasicMachine {
+impl<F: PrimeField64, EF: ExtensionField<F>> MachineWithRangeChip<256> for BasicMachine<F, EF> {
     fn range(&self) -> &RangeCheckerChip<256> {
         &self.range
     }

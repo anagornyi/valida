@@ -8,8 +8,10 @@ use alloc::vec::Vec;
 use core::iter;
 use core::marker::Sync;
 use core::mem::transmute;
+
 use serde::{Deserialize, Serialize};
-use valida_bus::{MachineWithGeneralBus, MachineWithMemBus};
+
+use valida_bus::{MachineWithGeneralBus, MachineWithMemBus, MachineWithProgramBus};
 use valida_machine::{
     instructions, Chip, Instruction, InstructionWord, Interaction, Operands, Word,
 };
@@ -93,7 +95,11 @@ pub struct Registers {
 
 impl<M> Chip<M> for CpuChip
 where
-    M: MachineWithMemoryChip + MachineWithGeneralBus + MachineWithMemBus + Sync,
+    M: MachineWithProgramBus
+        + MachineWithMemoryChip
+        + MachineWithGeneralBus
+        + MachineWithMemBus
+        + Sync,
 {
     fn generate_trace(&self, machine: &M) -> RowMajorMatrix<M::F> {
         let mut rows = self
@@ -115,6 +121,7 @@ where
     }
 
     fn global_sends(&self, machine: &M) -> Vec<Interaction<M::F>> {
+        // Memory bus channels
         let mem_sends = (0..3).map(|i| {
             let channel = &CPU_COL_MAP.mem_channels[i];
             let is_read = VirtualPairCol::single_main(channel.is_read);
@@ -132,6 +139,7 @@ where
             }
         });
 
+        // General bus channel
         let mut fields = vec![VirtualPairCol::single_main(CPU_COL_MAP.instruction.opcode)];
         fields.extend(
             CPU_COL_MAP
@@ -150,7 +158,27 @@ where
             argument_index: machine.general_bus(),
         };
 
-        mem_sends.chain(iter::once(send_general)).collect()
+        // Program ROM bus channel
+        let pc = VirtualPairCol::single_main(CPU_COL_MAP.pc);
+        let opcode = VirtualPairCol::single_main(CPU_COL_MAP.instruction.opcode);
+        let mut fields = vec![pc, opcode];
+        fields.extend(
+            CPU_COL_MAP
+                .instruction
+                .operands
+                .0
+                .map(|op| VirtualPairCol::single_main(op)),
+        );
+        let send_program = Interaction {
+            fields,
+            count: VirtualPairCol::one(),
+            argument_index: machine.program_bus(),
+        };
+
+        mem_sends
+            .chain(iter::once(send_general))
+            .chain(iter::once(send_program))
+            .collect()
     }
 }
 
@@ -320,7 +348,12 @@ impl CpuChip {
                 padded_row[CPU_COL_MAP.pc] = pc;
                 padded_row[CPU_COL_MAP.fp] = fp;
                 padded_row[CPU_COL_MAP.clk] = clk + F::from_canonical_u32(n as u32 + 1);
+
+                // STOP instructions
                 padded_row[CPU_COL_MAP.opcode_flags.is_stop] = F::ONE;
+                padded_row[CPU_COL_MAP.instruction.opcode] = F::from_canonical_u32(STOP);
+
+                // Memory columns
                 padded_row[CPU_COL_MAP.mem_channels[0].is_read] = F::ONE;
                 padded_row[CPU_COL_MAP.mem_channels[1].is_read] = F::ONE;
                 padded_row[CPU_COL_MAP.mem_channels[2].is_read] = F::ZERO;
